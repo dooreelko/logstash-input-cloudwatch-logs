@@ -185,35 +185,57 @@ class LogStash::Inputs::CloudWatch_Logs < LogStash::Inputs::Base
       end
       params = {
           :log_group_name => group,
-          :start_time => @sincedb[group],
-          :interleaved => true,
           :next_token => next_token
       }
-      resp = @cloudwatch.filter_log_events(params)
+      resp = @cloudwatch.describe_log_streams(params)
 
-      resp.events.each do |event|
-        process_log(event, group)
+      resp.log_streams.each do |stream|
+        process_log_stream(stream.log_stream_name, group)
       end
 
-      _sincedb_write
-
       next_token = resp.next_token
-      break if next_token.nil?
+      break if next_token.nil? or stop?
     end
     @priority.delete(group)
     @priority << group
   end #def process_group
 
+  private
+  def process_log_stream(stream, group)
+    next_token = nil
+
+    @logger.debug("processing stream #{stream} of group #{group}")
+
+    loop do
+      params = {
+        :log_group_name => group,
+        :log_stream_name => stream,
+        :start_from_head => true,
+        :start_time => @sincedb[group],
+        :next_token => next_token
+      }
+      resp = @cloudwatch.get_log_events(params)
+
+      resp.events.each do |event|
+        process_log(event, stream, group)
+      end
+
+      _sincedb_write
+
+      next_token = resp.next_token
+      break if next_token.nil? or stop?
+    end
+  end
+
   # def process_log
   private
-  def process_log(log, group)
+  def process_log(log, stream, group)
 
     @codec.decode(log.message.to_str) do |event|
       event.set("@timestamp", parse_time(log.timestamp))
       event.set("[cloudwatch_logs][ingestion_time]", parse_time(log.ingestion_time))
       event.set("[cloudwatch_logs][log_group]", group)
-      event.set("[cloudwatch_logs][log_stream]", log.log_stream_name)
-      event.set("[cloudwatch_logs][event_id]", log.event_id)
+      event.set("[cloudwatch_logs][log_stream]", stream)
       decorate(event)
 
       @queue << event
