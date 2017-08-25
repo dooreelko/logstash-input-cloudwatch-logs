@@ -11,6 +11,9 @@
 Specify an individual log group or array of groups, and this plugin will scan
 all log streams in that group, and pull in any new log events.
 
+This fork fixes the problem that filter_messages vertually never returns
+if the number of logs is very big (hundreds of streams)
+
 Optionally, you may set the `log_group_prefix` parameter to true
 which will scan for all log groups matching the specified prefix(s)
 and ingest all logs available in all of the matching groups.
