@@ -222,7 +222,7 @@ class LogStash::Inputs::CloudWatch_Logs < LogStash::Inputs::Base
 
       _sincedb_write
 
-      next_token = resp.next_token
+      next_token = resp.next_forward_token
       break if next_token.nil? or stop?
     end
   end
